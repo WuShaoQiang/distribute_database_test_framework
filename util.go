@@ -1,4 +1,4 @@
-package test
+package distribute_database_test_framework
 
 import (
 	"log"

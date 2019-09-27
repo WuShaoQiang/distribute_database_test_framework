@@ -1,4 +1,4 @@
-package test
+package distribute_database_test_framework
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ func (suite *DMLTestSuite) startPDServers(pdEndpoints, clientAddrs []string) {
 	for idx, pdEndpoint := range pdEndpoints {
 		initialCluster = append(initialCluster, fmt.Sprintf("pd%d=http://%s", idx+1, pdEndpoint))
 	}
-	for i := 0; i < suite.pdServerCount; i++ {
+	for i := 0; i < pdServerCount; i++ {
 		name := fmt.Sprintf("pd%d", i+1)
 		pd := pdServer{
 			name:           name,
@@ -24,21 +24,21 @@ func (suite *DMLTestSuite) startPDServers(pdEndpoints, clientAddrs []string) {
 		}
 		err := pd.start()
 		suite.Require().NoError(err)
-		suite.pdServers = append(suite.pdServers, &pd)
+		pdServers = append(pdServers, &pd)
 	}
 }
 
 func (pd *pdServer) start() error {
 	var cmd *exec.Cmd
 	cmd = exec.Command(filepath.Join(binDir, "/pd-server"),
-		fmt.Sprintf("--name=%s", pd.name),
-		fmt.Sprintf("--data-dir=%s", pd.dataDir),
-		fmt.Sprintf("--client-urls=%s", pd.clientAddr),
-		fmt.Sprintf("--peer-urls=%s", pd.peerAddr),
-		fmt.Sprintf("--initial-cluster=%s", pd.initialCluster),
-		fmt.Sprintf("--log-file=%s", pd.logFile))
+		fmt.Sprintf("--name=%s", name),
+		fmt.Sprintf("--data-dir=%s", dataDir),
+		fmt.Sprintf("--client-urls=%s", clientAddr),
+		fmt.Sprintf("--peer-urls=%s", peerAddr),
+		fmt.Sprintf("--initial-cluster=%s", initialCluster),
+		fmt.Sprintf("--log-file=%s", logFile))
 
-	pd.Cmd = cmd
+	Cmd = cmd
 	return cmd.Start()
 
 }

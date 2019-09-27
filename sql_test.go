@@ -1,4 +1,4 @@
-package test
+package distribute_database_test_framework
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 func (suite *DMLTestSuite) exec(query string, args ...interface{}) (res sql.Result, err error) {
 	for i := 0; i < 10; i++ {
 		ctx, _ := context.WithTimeout(context.Background(),2*time.Second)
-		server := suite.getOneServerRandomly()
+		server := getOneServerRandomly()
 		server.db.ExecContext(ctx,"use test_dml")
 		res, err = server.db.ExecContext(ctx,query, args...)
 		if isRetryableError(err) {
@@ -34,7 +34,7 @@ func (suite *DMLTestSuite) exec(query string, args ...interface{}) (res sql.Resu
 
 func (suite *DMLTestSuite) query(query string, args ...interface{}) (res *sql.Rows, err error) {
 	for i := 0; i < 10; i++ {
-		server := suite.getOneServerRandomly()
+		server := getOneServerRandomly()
 		ctx, _ := context.WithTimeout(context.Background(),2*time.Second)
 		server.db.QueryContext(ctx,"use test_dml")
 		res, err = server.db.QueryContext(ctx,query, args...)
