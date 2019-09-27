@@ -358,18 +358,18 @@ func (suite *DMLTestSuite) transfer(tableName string, sender, receiver, count in
 }
 
 func (suite *DMLTestSuite) doTransfer(txn *sql.Tx, tableName string, sender, receiver, count int) (err error) {
-	row := txn.QueryRow(fmt.Sprintf("SELECT name FROM %s WHERE id = %d AND money >= %d", tableName, sender, count))
+	row := txn.QueryRow(fmt.Sprintf("select name from %s where id = %d and money >= %d", tableName, sender, count))
 	var scanedName string
 	err = row.Scan(&scanedName)
 	if err != nil {
 		return err
 	}
 	suite.Equal(sender, scanedName)
-	_, err = txn.Exec(fmt.Sprintf("UPDATE %s SET money = money + %d WHERE id = %d", tableName, count, receiver))
+	_, err = txn.Exec(fmt.Sprintf("update %s set money = money + %d where id = %d", tableName, count, receiver))
 	if err != nil {
 		return err
 	}
-	_, err = txn.Exec(fmt.Sprintf("UPDATE %s SET money = money - %d WHERE id = %d", tableName, count, sender))
+	_, err = txn.Exec(fmt.Sprintf("update %s set money = money - %d where id = %d", tableName, count, sender))
 	if err != nil {
 		return err
 	}
