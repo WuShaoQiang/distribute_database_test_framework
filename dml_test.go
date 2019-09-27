@@ -98,13 +98,13 @@ func (suite *DMLTestSuite) SetupSuite() {
 		clientAddrs = append(clientAddrs, fmt.Sprintf("%s:%d", suite.host, suite.getOnePort()))
 	}
 
-	startPDServers(pdEndpoints, clientAddrs)
-	startTiKVServers(clientAddrs)
-	startTiDBServers(clientAddrs)
+	suite.startPDServers(pdEndpoints, clientAddrs)
+	suite.startTiKVServers(clientAddrs)
+	suite.startTiDBServers(clientAddrs)
 
 	if suite.randomRestart {
 		suite.wg.Add(1)
-		go restartTiDBRandomly()
+		go suite.restartTiDBRandomly()
 	}
 }
 
@@ -113,15 +113,15 @@ func (suite *DMLTestSuite) TearDownSuite() {
 	suite.cancel()
 	suite.wg.Wait()
 	for _, server := range suite.tidbServers {
-		suite.NoError(kill())
+		suite.NoError(server.kill())
 	}
 
 	for _, server := range suite.tikvServers {
-		suite.NoError(kill())
+		suite.NoError(server.kill())
 	}
 
 	for _, server := range suite.pdServers {
-		suite.NoError(kill())
+		suite.NoError(server.kill())
 	}
 
 	suite.removeAllDir()
@@ -129,7 +129,7 @@ func (suite *DMLTestSuite) TearDownSuite() {
 
 func (suite *DMLTestSuite) TestInsert() {
 	tableName := "test_insert"
-	createTable(tableName)
+	suite.createTable(tableName)
 
 	var wg sync.WaitGroup
 	wg.Add(suite.goroutineCount)
@@ -138,7 +138,7 @@ func (suite *DMLTestSuite) TestInsert() {
 			defer wg.Done()
 			for j := suite.operationCountEachGoroutine * n; j < suite.operationCountEachGoroutine*(n+1); j++ {
 				time.Sleep(100 * time.Millisecond)
-				_, err := exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j))
+				_, err := suite.exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j))
 				if err != nil {
 					suite.True(isDuplicateError(err))
 				}
@@ -149,7 +149,7 @@ func (suite *DMLTestSuite) TestInsert() {
 
 	//verify
 	m := make(map[int]int)
-	rows, err := query(fmt.Sprintf("SELECT c1,c2 FROM %s", tableName))
+	rows, err := suite.query(fmt.Sprintf("SELECT c1,c2 FROM %s", tableName))
 	suite.NoError(err)
 	suite.NotNil(rows)
 	for rows.Next() {
@@ -159,12 +159,12 @@ func (suite *DMLTestSuite) TestInsert() {
 		m[k] = v
 	}
 	suite.Len(m, suite.goroutineCount*suite.operationCountEachGoroutine)
-	dropTable(tableName)
+	suite.dropTable(tableName)
 }
 
 func (suite *DMLTestSuite) TestUpdate() {
 	tableName := "test_update"
-	createTable(tableName)
+	suite.createTable(tableName)
 
 	var wg sync.WaitGroup
 	wg.Add(suite.goroutineCount)
@@ -173,7 +173,7 @@ func (suite *DMLTestSuite) TestUpdate() {
 			defer wg.Done()
 			for j := suite.operationCountEachGoroutine * n; j < suite.operationCountEachGoroutine*(n+1); j++ {
 				time.Sleep(50 * time.Millisecond)
-				_, err := exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j))
+				_, err := suite.exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j))
 				if err != nil {
 					suite.True(isDuplicateError(err))
 				}
@@ -188,7 +188,7 @@ func (suite *DMLTestSuite) TestUpdate() {
 			defer wg.Done()
 			for j := suite.operationCountEachGoroutine * n; j < suite.operationCountEachGoroutine*(n+1); j++ {
 				time.Sleep(50 * time.Millisecond)
-				_, err := exec(fmt.Sprintf("update %s set c2 = %d where c1 = %d", tableName, j+1, j))
+				_, err := suite.exec(fmt.Sprintf("update %s set c2 = %d where c1 = %d", tableName, j+1, j))
 				if err != nil {
 					suite.True(isDuplicateError(err))
 				}
@@ -199,7 +199,7 @@ func (suite *DMLTestSuite) TestUpdate() {
 
 	m := make(map[int]int)
 
-	rows, err := query(fmt.Sprintf("select c1,c2 from %s", tableName))
+	rows, err := suite.query(fmt.Sprintf("select c1,c2 from %s", tableName))
 	suite.NoError(err)
 	suite.NotNil(rows)
 	for rows.Next() {
@@ -212,12 +212,12 @@ func (suite *DMLTestSuite) TestUpdate() {
 	for k, v := range m {
 		suite.Equal(v, k+1)
 	}
-	dropTable(tableName)
+	suite.dropTable(tableName)
 }
 
 func (suite *DMLTestSuite) TestDelete() {
 	tableName := "test_delete"
-	createTable(tableName)
+	suite.createTable(tableName)
 
 	var wg sync.WaitGroup
 	wg.Add(suite.goroutineCount)
@@ -226,7 +226,7 @@ func (suite *DMLTestSuite) TestDelete() {
 			defer wg.Done()
 			for j := suite.operationCountEachGoroutine * n; j < suite.operationCountEachGoroutine*(n+1); j++ {
 				time.Sleep(50 * time.Millisecond)
-				_, err := exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j))
+				_, err := suite.exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j))
 				if err != nil {
 					suite.True(isDuplicateError(err))
 				}
@@ -241,7 +241,7 @@ func (suite *DMLTestSuite) TestDelete() {
 			defer wg.Done()
 			for j := suite.operationCountEachGoroutine * n; j < suite.operationCountEachGoroutine*(n+1); j++ {
 				time.Sleep(50 * time.Millisecond)
-				_, err := exec(fmt.Sprintf("delete from %s where c1 = %d", tableName, j))
+				_, err := suite.exec(fmt.Sprintf("delete from %s where c1 = %d", tableName, j))
 				if err != nil {
 					suite.True(isDuplicateError(err))
 				}
@@ -252,7 +252,7 @@ func (suite *DMLTestSuite) TestDelete() {
 
 	m := make(map[int]int)
 
-	rows, err := query(fmt.Sprintf("select c1,c2 from %s", tableName))
+	rows, err := suite.query(fmt.Sprintf("select c1,c2 from %s", tableName))
 	suite.NoError(err)
 	suite.NotNil(rows)
 	for rows.Next() {
@@ -262,12 +262,12 @@ func (suite *DMLTestSuite) TestDelete() {
 		m[k] = v
 	}
 	suite.Len(m, 0)
-	dropTable(tableName)
+	suite.dropTable(tableName)
 }
 
 func (suite *DMLTestSuite) TestBankTransfer() {
 	tableName := "test_bank_transfer"
-	_, err := exec(fmt.Sprintf("CREATE TABLE %s (id int,money int,primary key(id))", tableName))
+	_, err := suite.exec(fmt.Sprintf("CREATE TABLE %s (id int,money int,primary key(id))", tableName))
 	suite.NoError(err)
 	var l sync.Mutex
 	expected := make(map[int]int)
@@ -279,7 +279,7 @@ func (suite *DMLTestSuite) TestBankTransfer() {
 			defer wg.Done()
 			for j := suite.operationCountEachGoroutine * n; j < suite.operationCountEachGoroutine*(n+1); j++ {
 				time.Sleep(50 * time.Millisecond)
-				_, err := exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j+1))
+				_, err := suite.exec(fmt.Sprintf("insert into %s values (%d,%d)", tableName, j, j+1))
 				if err == nil || isDuplicateError(err) {
 					l.Lock()
 					expected[j]=j+1
@@ -308,7 +308,7 @@ func (suite *DMLTestSuite) TestBankTransfer() {
 	}
 	wg.Wait()
 
-	rows, err := query(fmt.Sprintf("SELECT id,money FROM %s", tableName))
+	rows, err := suite.query(fmt.Sprintf("SELECT id,money FROM %s", tableName))
 	suite.NoError(err)
 	suite.Require().NotNil(rows)
 	m := make(map[int]int)
@@ -327,7 +327,7 @@ func (suite *DMLTestSuite) TestBankTransfer() {
 
 func (suite *DMLTestSuite) getTransaction() (txn *sql.Tx, err error) {
 	for i:=0;i<10;i++{
-		server := getOneServerRandomly()
+		server := suite.getOneServerRandomly()
 		txn, err = server.db.Begin()
 		if txn != nil && err == nil {
 			return

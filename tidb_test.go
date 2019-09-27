@@ -12,16 +12,16 @@ import (
 )
 
 func (suite *DMLTestSuite) startTiDBServers(clientAddrs []string) {
-	for i := 0; i < tidbServerCount; i++ {
+	for i := 0; i < suite.tidbServerCount; i++ {
 		tidb := &tidbServer{
-			port:       getOnePort(),
-			statusPort: getOnePort(),
+			port:       suite.getOnePort(),
+			statusPort: suite.getOnePort(),
 			path:       strings.Join(clientAddrs, ","),
 			logFile:    filepath.Join(workDir, fmt.Sprintf("tidb%d.log", i+1)),
 		}
-		addr = fmt.Sprintf("%s:%d", host, port)
+		tidb.addr = fmt.Sprintf("%s:%d", suite.host, tidb.port)
 		suite.NoError(tidb.startServer())
-		tidbServers = append(tidbServers, tidb)
+		suite.tidbServers = append(suite.tidbServers, tidb)
 	}
 }
 
@@ -38,12 +38,12 @@ func (tidb *tidbServer) start() error {
 	cmd = exec.Command(filepath.Join(binDir, "/tidb-server"),
 		"--store=tikv",
 		// "-L=debug",
-		fmt.Sprintf("--log-file=%s", logFile),
-		fmt.Sprintf("--path=%s", path),
-		fmt.Sprintf("-P=%d", port),
-		fmt.Sprintf("--status=%d", statusPort))
+		fmt.Sprintf("--log-file=%s", tidb.logFile),
+		fmt.Sprintf("--path=%s", tidb.path),
+		fmt.Sprintf("-P=%d", tidb.port),
+		fmt.Sprintf("--status=%d", tidb.statusPort))
 
-	Cmd = cmd
+	tidb.Cmd = cmd
 	err := cmd.Start()
 	return err
 }
@@ -56,17 +56,17 @@ func (suite *DMLTestSuite) restartTiDBRandomly() {
 	defer suite.wg.Done()
 	for {
 		select {
-		case <-time.After(randomRestartDuration):
+		case <-time.After(suite.randomRestartDuration):
 			err := suite.getOneServerRandomly().restart()
 			suite.NoError(err)
-		case <-ctx.Done():
+		case <-suite.ctx.Done():
 			return
 		}
 	}
 }
 
 func (tidb *tidbServer) restart() (err error) {
-	log.Printf("restarting tidb server %s", addr)
+	log.Printf("restarting tidb server %s", tidb.addr)
 	err = tidb.kill()
 	if err != nil {
 		return
@@ -76,8 +76,8 @@ func (tidb *tidbServer) restart() (err error) {
 
 func (tidb *tidbServer) connectToDatabase() (err error) {
 	for i := 0; i < 5; i++ {
-		log.Printf("connecting to %s", addr)
-		db, err = sql.Open("mysql", fmt.Sprintf("root@(%s)/", addr))
+		log.Printf("connecting to %s", tidb.addr)
+		tidb.db, err = sql.Open("mysql", fmt.Sprintf("root@(%s)/", tidb.addr))
 		if err != nil {
 			time.Sleep(2 * time.Second)
 			continue
@@ -102,10 +102,10 @@ func (tidb *tidbServer) connectToDatabase() (err error) {
 
 func (suite *DMLTestSuite) getOneServerRandomly() *tidbServer {
 	for i := 0; i < 10; i++ {
-		i := rand.Intn(tidbServerCount)
+		i := rand.Intn(suite.tidbServerCount)
 		log.Printf("get number %d server",i)
-		if tidbServers[i] != nil {
-			return tidbServers[i]
+		if suite.tidbServers[i] != nil {
+			return suite.tidbServers[i]
 		}
 	}
 

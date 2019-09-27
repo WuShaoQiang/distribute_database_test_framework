@@ -8,28 +8,28 @@ import (
 )
 
 func (suite *DMLTestSuite) startTiKVServers(clientAddrs []string) {
-	for i := 0; i < tikvServerCount; i++ {
+	for i := 0; i < suite.tikvServerCount; i++ {
 		tikv := tikvServer{
 			pdEndpoints: strings.Join(clientAddrs, ","),
-			addr:        fmt.Sprintf("%s:%d", "127.0.0.1", getOnePort()),
+			addr:        fmt.Sprintf("%s:%d", "127.0.0.1", suite.getOnePort()),
 			dataDir:     filepath.Join(workDir, fmt.Sprintf("tikv%d", i+1)),
 			logFile:     filepath.Join(workDir, fmt.Sprintf("tikv%d.log", i+1)),
 		}
 		err := tikv.start()
 		suite.Require().NoError(err)
-		tikvServers = append(tikvServers, &tikv)
+		suite.tikvServers = append(suite.tikvServers, &tikv)
 	}
 }
 
 func (tikv *tikvServer) start() error {
 	var cmd *exec.Cmd
 	cmd = exec.Command(filepath.Join(binDir, "/tikv-server"),
-		fmt.Sprintf("--pd-endpoints=%s", pdEndpoints),
-		fmt.Sprintf("--addr=%s", addr),
-		fmt.Sprintf("--data-dir=%s", dataDir),
-		fmt.Sprintf("--log-file=%s", logFile))
+		fmt.Sprintf("--pd-endpoints=%s", tikv.pdEndpoints),
+		fmt.Sprintf("--addr=%s", tikv.addr),
+		fmt.Sprintf("--data-dir=%s", tikv.dataDir),
+		fmt.Sprintf("--log-file=%s", tikv.logFile))
 
-	Cmd = cmd
+	tikv.Cmd = cmd
 	return cmd.Start()
 }
 
